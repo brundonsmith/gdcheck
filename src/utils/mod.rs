@@ -56,10 +56,13 @@ impl<T: Clone + std::fmt::Debug + PartialEq> Src<T> {
 }
 
 pub trait Srcable: Clone + std::fmt::Debug + PartialEq {
-    fn no_src(self) -> Src<Self>;
-}
+    fn with_src(self, src: Slice) -> Src<Self> {
+        Src {
+            src: Some(src),
+            node: self,
+        }
+    }
 
-impl<T: Clone + std::fmt::Debug + PartialEq> Srcable for T {
     fn no_src(self) -> Src<Self> {
         Src {
             src: None,
@@ -67,6 +70,8 @@ impl<T: Clone + std::fmt::Debug + PartialEq> Srcable for T {
         }
     }
 }
+
+impl<T: Clone + std::fmt::Debug + PartialEq> Srcable for T {}
 
 pub type ParseResult<'a, T> = IResult<StringAndSlice<'a>, T, VerboseError<StringAndSlice<'a>>>;
 

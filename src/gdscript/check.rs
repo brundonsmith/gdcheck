@@ -37,12 +37,9 @@ impl Check for Src<Declaration> {
         match &self.node {
             Declaration::Extends(class) => {}
             Declaration::ClassName(class) => {}
-            Declaration::ValDeclaration(ValDeclaration {
-                is_const,
-                name,
-                declared_type,
-                value,
-            }) => {}
+            Declaration::ValDeclaration(val_declaration) => {
+                val_declaration.check(project, current_module, report_error)
+            }
             Declaration::Annotation { name, arguments } => {}
             Declaration::Enum { name, variants } => {}
             Declaration::Func {
@@ -87,7 +84,9 @@ impl Check for Src<Statement> {
         report_error: &F,
     ) {
         match &self.node {
-            Statement::ValDeclaration(_) => {}
+            Statement::ValDeclaration(val_declaration) => {
+                val_declaration.check(project, current_module, report_error)
+            }
             Statement::Assignment {
                 target,
                 value,
@@ -160,11 +159,12 @@ impl Check for ValDeclaration {
     ) {
         if let Some(declared_type) = &self.declared_type {
             if let Some(value) = &self.value {
-                if value
+                if !value
                     .infer_type(project, current_module)
                     .assignable_to(declared_type)
                 {
-                    report_error(todo!());
+                    println!("{:?} isn't assignable to {:?}!", value, declared_type);
+                    // report_error(todo!());
                 }
             }
         }

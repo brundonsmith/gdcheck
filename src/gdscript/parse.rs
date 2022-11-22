@@ -3,11 +3,13 @@ use nom::{
     bytes::complete::{tag, take_while, take_while1},
     combinator::{map, opt},
     error::{VerboseError, VerboseErrorKind},
-    multi::{many0, many1},
+    multi::{many0, many1, separated_list0},
     sequence::{preceded, terminated, tuple},
 };
 
-use crate::utils::{errors::ParseError, string_and_slice::StringAndSlice, ParseResult, Src};
+use crate::utils::{
+    errors::ParseError, string_and_slice::StringAndSlice, ParseResult, Src, Srcable,
+};
 
 use super::ast::*;
 
@@ -169,19 +171,48 @@ fn parse_initial_value<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, Src<Express
 }
 
 fn parse_expression<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, Src<Expression>> {
-    todo!()
+    alt((
+        map(parse_array_expression, |ast| ast.map(Expression::from)),
+        map(tag("true"), |s: StringAndSlice| {
+            Expression::Boolean(true).with_src(s.slice)
+        }),
+        map(tag("false"), |s: StringAndSlice| {
+            Expression::Boolean(false).with_src(s.slice)
+        }),
+        map(tag("null"), |s: StringAndSlice| {
+            Expression::Null.with_src(s.slice)
+        }),
+    ))(i)
+}
+
+fn parse_array_expression<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, Src<Array>> {
+    map(
+        tuple((
+            tag("["),
+            preceded(
+                whitespace_and_comments,
+                separated_list0(
+                    preceded(whitespace_and_comments, tag(",")),
+                    preceded(whitespace_and_comments, parse_expression),
+                ),
+            ),
+            preceded(whitespace_and_comments, tag("]")),
+        )),
+        |(open, values, close)| Array(values).with_src(open.spanning(&close).slice),
+    )(i)
 }
 
 fn parse_type<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, Src<Type>> {
     map(
-        alt((tag("int"), tag("String"))),
-        |src: StringAndSlice<'a>| Src {
-            src: Some(src.slice),
-            node: match src.as_str() {
+        alt((tag("int"), tag("float"), tag("String"))),
+        |s: StringAndSlice<'a>| {
+            match s.as_str() {
                 "int" => Type::IntType,
+                "float" => Type::FloatType,
                 "String" => Type::StringType,
                 _ => unreachable!(),
-            },
+            }
+            .with_src(s.slice)
         },
     )(i)
 }
@@ -197,7 +228,7 @@ fn whitespace_and_comments<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ()> {
                 take_while1(|c: char| c == ' ' || c == '\n' || c == '\t' || c == '\r'),
                 |_| (),
             ),
-            map(tuple((tag(";"), take_while(|c| c != '\n'))), |_| ()),
+            map(tuple((tag("#"), take_while(|c| c != '\n'))), |_| ()),
         ))),
         |_| (),
     )(i)
@@ -210,7 +241,7 @@ fn whitespace_and_comments1<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ()> {
                 take_while1(|c: char| c == ' ' || c == '\n' || c == '\t' || c == '\r'),
                 |_| (),
             ),
-            map(tuple((tag(";"), take_while(|c| c != '\n'))), |_| ()),
+            map(tuple((tag("#"), take_while(|c| c != '\n'))), |_| ()),
         ))),
         |_| (),
     )(i)

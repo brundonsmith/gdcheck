@@ -3,24 +3,39 @@ mod gdscript;
 mod godot_project;
 mod utils;
 
-use std::{convert::TryInto, env::current_dir, path::PathBuf};
+use std::{collections::HashMap, convert::TryInto, env::current_dir, path::PathBuf};
 
 use gdproject_metadata::ast::GDProjectMetadata;
+use godot_project::GodotProject;
 use walkdir::WalkDir;
 
-use crate::gdscript::parse::parse_script;
+use crate::gdscript::{check::Check, parse::parse_script};
 
 fn main() -> Result<(), ()> {
     let files = find_files();
 
     let project_code = std::fs::read_to_string(files.gdproject_metadata.unwrap()).unwrap();
-    let project: GDProjectMetadata = (&project_code).try_into().unwrap();
+    let metadata: GDProjectMetadata = (&project_code).try_into().unwrap();
+
+    let mut scripts = HashMap::new();
 
     for script in files.gdscripts {
         let script_code = std::fs::read_to_string(script.clone()).unwrap();
         let parsed = parse_script(&script_code).unwrap();
 
         println!("\n\n\n\n{}\n\n{:?}", script.to_string_lossy(), parsed);
+        scripts.insert(String::from(script.to_string_lossy()), parsed);
+    }
+
+    let project = GodotProject {
+        metadata,
+        rule_severity: HashMap::new(),
+        scripts,
+    };
+
+    for (name, script) in project.scripts.iter() {
+        println!("Checking {}", name);
+        script.check(&project, script, &|_| todo!())
     }
 
     Ok(())
