@@ -21,7 +21,7 @@ impl<'a> StringAndSlice<'a> {
     pub fn spanning(&self, other: &Self) -> Self {
         Self {
             string: self.string,
-            slice: self.slice.spanning(&other.slice),
+            slice: self.slice.spanning(other.slice),
         }
     }
 

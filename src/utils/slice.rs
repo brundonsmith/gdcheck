@@ -16,7 +16,7 @@ impl Slice {
 }
 
 impl Slice {
-    pub fn contains(&self, other: &Slice) -> bool {
+    pub fn contains(&self, other: Slice) -> bool {
         self.start <= other.start && self.end >= other.end
     }
 
@@ -24,11 +24,11 @@ impl Slice {
         index >= self.start && index <= self.end
     }
 
-    pub fn overlaps(&self, other: &Slice) -> bool {
+    pub fn overlaps(&self, other: Slice) -> bool {
         self.contains(other) || self.contains_index(other.start) != self.contains_index(other.end)
     }
 
-    pub fn spanning(&self, other: &Slice) -> Slice {
+    pub fn spanning(&self, other: Slice) -> Slice {
         Self {
             start: usize::min(self.start, other.start),
             end: usize::max(self.end, other.end),

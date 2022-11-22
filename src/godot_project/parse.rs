@@ -16,7 +16,6 @@ use nom::sequence::terminated;
 use nom::sequence::{preceded, tuple};
 
 use crate::utils::errors::ParseError;
-use crate::utils::identifier;
 use crate::utils::{number_literal, string_literal};
 use crate::utils::{string_and_slice::StringAndSlice, ParseResult};
 
@@ -30,7 +29,6 @@ pub fn parse_godot_project(code: &String) -> Result<GodotProject, ParseError> {
 
     match res {
         Ok((i, items)) => {
-            println!("{:?}", items);
             // if i.len() > 0 {
             //     Err(ParseError {
             //         index: Some(i.slice.start),
@@ -218,7 +216,7 @@ fn parse_object<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ObjectValue> {
         tuple((
             tag("Object"),
             preceded(whitespace_and_comments, tag("(")),
-            preceded(whitespace_and_comments, identifier),
+            preceded(whitespace_and_comments, parse_key),
             preceded(whitespace_and_comments, tag(",")),
             separated_list1(
                 preceded(whitespace_and_comments, tag(",")),
@@ -236,7 +234,7 @@ fn parse_object<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ObjectValue> {
 fn parse_constructed<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ConstructedValue> {
     map(
         tuple((
-            identifier,
+            parse_key,
             preceded(whitespace_and_comments, tag("(")),
             separated_list1(preceded(whitespace_and_comments, tag(",")), parse_value),
             preceded(whitespace_and_comments, tag(")")),
@@ -248,7 +246,7 @@ fn parse_constructed<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ConstructedVa
     )(i)
 }
 
-pub fn whitespace_and_comments<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ()> {
+fn whitespace_and_comments<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ()> {
     map(
         many0(alt((
             map(

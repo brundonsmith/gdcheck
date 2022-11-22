@@ -1,7 +1,6 @@
 use nom::{
-    branch::alt,
     bytes::complete::{escaped, tag, take_while, take_while1},
-    character::complete::{alphanumeric0, alphanumeric1, anychar, one_of},
+    character::complete::one_of,
     combinator::{cut, map, opt},
     error::{context, VerboseError},
     sequence::{pair, tuple},
@@ -21,17 +20,13 @@ pub struct Src<T> {
 }
 
 impl<T: Clone + std::fmt::Debug + PartialEq> Src<T> {
-    pub fn contains(&self, other: &Slice) -> bool {
+    pub fn contains(&self, other: Slice) -> bool {
         self.src.map(|s| s.contains(other)).unwrap_or(false)
     }
 
     pub fn spanning<O>(&self, other: &Src<O>) -> Option<Slice> {
         self.src
-            .map(|left_src| {
-                other
-                    .src
-                    .map(move |right_src| left_src.spanning(&right_src))
-            })
+            .map(|left_src| other.src.map(move |right_src| left_src.spanning(right_src)))
             .flatten()
     }
 
@@ -51,7 +46,7 @@ pub fn string_literal<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, Src<String>>
         map(
             pair(tag("\""), cut(pair(string_contents, tag("\"")))),
             |(open_quote, (contents, close_quote))| Src {
-                src: Some(open_quote.slice.spanning(&close_quote.slice)),
+                src: Some(open_quote.slice.spanning(close_quote.slice)),
                 node: contents.as_str().to_owned(),
             },
         ),
@@ -76,10 +71,6 @@ pub fn number_literal<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, Src<String>>
             }
         },
     )(i)
-}
-
-pub fn identifier<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, StringAndSlice<'a>> {
-    take_while1(|ch: char| ch.is_alphanumeric() || ch == '_' || ch == '$')(i)
 }
 
 pub fn numeric<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, StringAndSlice<'a>> {

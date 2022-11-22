@@ -1,4 +1,4 @@
-// mod gdscript;
+mod gdscript;
 mod godot_project;
 mod utils;
 
@@ -7,21 +7,20 @@ use std::{convert::TryInto, env::current_dir, path::PathBuf};
 use godot_project::GodotProject;
 use walkdir::WalkDir;
 
-// use crate::gdscript::parse::parse_script;
+use crate::gdscript::parse::parse_script;
 
 fn main() -> Result<(), ()> {
     let files = find_files();
 
     let project_code = std::fs::read_to_string(files.godot_project.unwrap()).unwrap();
     let project: GodotProject = (&project_code).try_into().unwrap();
-    println!("{:?}", project);
 
-    // for script in files.gdscripts {
-    //     let script_code = std::fs::read_to_string(script).unwrap();
-    //     let parsed = parse_script(script_code.as_str()).unwrap();
+    for script in files.gdscripts {
+        let script_code = std::fs::read_to_string(script.clone()).unwrap();
+        let parsed = parse_script(&script_code).unwrap();
 
-    //     println!("{:?}", parsed);
-    // }
+        println!("\n\n\n\n{}\n\n{:?}", script.to_string_lossy(), parsed);
+    }
 
     Ok(())
 }
