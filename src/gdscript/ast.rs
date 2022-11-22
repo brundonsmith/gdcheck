@@ -2,6 +2,11 @@ use enum_variant_type::EnumVariantType;
 
 use crate::utils::Src;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct GDScript {
+    pub declarations: Vec<Src<Declaration>>,
+}
+
 #[derive(Debug, Clone, PartialEq, EnumVariantType)]
 pub enum Declaration {
     #[evt(derive(Debug, Clone, PartialEq))]
@@ -28,8 +33,8 @@ pub enum Declaration {
     #[evt(derive(Debug, Clone, PartialEq))]
     Func {
         is_static: bool,
-        name: String,
-        args: Vec<(String, Option<Type>)>,
+        name: Src<String>,
+        args: Vec<(Src<String>, Option<Type>)>,
         return_type: Option<Type>,
         body: Block,
     },
@@ -268,4 +273,16 @@ pub enum Type {
 
     #[evt(derive(Debug, Clone, PartialEq))]
     AnyType,
+}
+
+impl Src<Type> {
+    pub fn assignable_to(&self, other: &Src<Type>) -> bool {
+        if self.node == other.node {
+            return true;
+        }
+
+        match (&self.node, &other.node) {
+            _ => false,
+        }
+    }
 }

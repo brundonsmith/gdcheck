@@ -1,10 +1,11 @@
+mod gdproject_metadata;
 mod gdscript;
 mod godot_project;
 mod utils;
 
 use std::{convert::TryInto, env::current_dir, path::PathBuf};
 
-use godot_project::ast::GodotProject;
+use gdproject_metadata::ast::GDProjectMetadata;
 use walkdir::WalkDir;
 
 use crate::gdscript::parse::parse_script;
@@ -12,8 +13,8 @@ use crate::gdscript::parse::parse_script;
 fn main() -> Result<(), ()> {
     let files = find_files();
 
-    let project_code = std::fs::read_to_string(files.godot_project.unwrap()).unwrap();
-    let project: GodotProject = (&project_code).try_into().unwrap();
+    let project_code = std::fs::read_to_string(files.gdproject_metadata.unwrap()).unwrap();
+    let project: GDProjectMetadata = (&project_code).try_into().unwrap();
 
     for script in files.gdscripts {
         let script_code = std::fs::read_to_string(script.clone()).unwrap();
@@ -26,7 +27,7 @@ fn main() -> Result<(), ()> {
 }
 
 fn find_files() -> FoundFiles {
-    let mut godot_project = None;
+    let mut gdproject_metadata = None;
     let mut gdscripts = Vec::new();
 
     for entry in WalkDir::new(current_dir().unwrap()) {
@@ -38,7 +39,7 @@ fn find_files() -> FoundFiles {
             .map(|name| name == "project.godot")
             .unwrap_or(false)
         {
-            godot_project = Some(entry.into_path());
+            gdproject_metadata = Some(entry.into_path());
         } else if entry
             .path()
             .extension()
@@ -50,13 +51,13 @@ fn find_files() -> FoundFiles {
     }
 
     FoundFiles {
-        godot_project,
+        gdproject_metadata,
         gdscripts,
     }
 }
 
 #[derive(Debug, Clone)]
 struct FoundFiles {
-    pub godot_project: Option<PathBuf>,
+    pub gdproject_metadata: Option<PathBuf>,
     pub gdscripts: Vec<PathBuf>,
 }

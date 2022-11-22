@@ -21,7 +21,7 @@ use crate::utils::{string_and_slice::StringAndSlice, ParseResult};
 
 use super::ast::*;
 
-pub fn parse_godot_project(code: &String) -> Result<GodotProject, ParseError> {
+pub fn parse_gdproject_metadata(code: &String) -> Result<GDProjectMetadata, ParseError> {
     let res = many0(terminated(
         preceded(whitespace_and_comments, parse_item),
         whitespace_and_comments,
@@ -36,7 +36,7 @@ pub fn parse_godot_project(code: &String) -> Result<GodotProject, ParseError> {
             //         message: "Failed to parse entire input".to_owned(),
             //     })
             // } else {
-            let mut project = GodotProject::new();
+            let mut project = GDProjectMetadata::new();
             let mut current_section_name = None;
             let mut current_section_entries = HashMap::new();
 

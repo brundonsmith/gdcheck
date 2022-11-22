@@ -1,20 +1,20 @@
 use enum_variant_type::EnumVariantType;
 
-use super::parse::parse_godot_project;
+use super::parse::parse_gdproject_metadata;
 use crate::utils::errors::ParseError;
 use std::{collections::HashMap, convert::TryFrom};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct GodotProject {
+pub struct GDProjectMetadata {
     pub front_section: Section,
     pub other_sections: HashMap<String, Section>,
 }
 
 type Section = HashMap<String, EntryValue>;
 
-impl GodotProject {
+impl GDProjectMetadata {
     pub fn new() -> Self {
-        GodotProject {
+        GDProjectMetadata {
             front_section: HashMap::new(),
             other_sections: HashMap::new(),
         }
@@ -56,10 +56,10 @@ pub struct GlobalScriptClass {
     pub path: String,
 }
 
-impl TryFrom<&String> for GodotProject {
+impl TryFrom<&String> for GDProjectMetadata {
     type Error = ParseError;
 
     fn try_from(value: &String) -> Result<Self, Self::Error> {
-        parse_godot_project(value)
+        parse_gdproject_metadata(value)
     }
 }

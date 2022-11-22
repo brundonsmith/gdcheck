@@ -11,7 +11,7 @@ use crate::utils::{errors::ParseError, string_and_slice::StringAndSlice, ParseRe
 
 use super::ast::*;
 
-pub fn parse_script(code: &String) -> Result<Vec<Src<Declaration>>, ParseError> {
+pub fn parse_script(code: &String) -> Result<GDScript, ParseError> {
     let res = terminated(
         many0(preceded(whitespace_and_comments, parse_declaration)),
         whitespace_and_comments,
@@ -26,7 +26,7 @@ pub fn parse_script(code: &String) -> Result<Vec<Src<Declaration>>, ParseError> 
             //         message: "Failed to parse entire input".to_owned(),
             //     })
             // } else {
-            Ok(declarations)
+            Ok(GDScript { declarations })
             // }
         }
         Err(error) => {

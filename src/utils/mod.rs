@@ -20,8 +20,25 @@ pub struct Src<T> {
 }
 
 impl<T: Clone + std::fmt::Debug + PartialEq> Src<T> {
-    pub fn contains(&self, other: Slice) -> bool {
-        self.src.map(|s| s.contains(other)).unwrap_or(false)
+    pub fn contains<O>(&self, other: &Src<O>) -> bool {
+        self.src
+            .map(|s| other.src.map(|other| s.contains(other)))
+            .flatten()
+            .unwrap_or(false)
+    }
+
+    pub fn after<O>(&self, other: &Src<O>) -> bool {
+        self.src
+            .map(|s| other.src.map(|other| s.start > other.end))
+            .flatten()
+            .unwrap_or(false)
+    }
+
+    pub fn before<O>(&self, other: &Src<O>) -> bool {
+        self.src
+            .map(|s| other.src.map(|other| s.end < other.start))
+            .flatten()
+            .unwrap_or(false)
     }
 
     pub fn spanning<O>(&self, other: &Src<O>) -> Option<Slice> {
@@ -34,6 +51,19 @@ impl<T: Clone + std::fmt::Debug + PartialEq> Src<T> {
         Src {
             src: self.src,
             node: f(self.node),
+        }
+    }
+}
+
+pub trait Srcable: Clone + std::fmt::Debug + PartialEq {
+    fn no_src(self) -> Src<Self>;
+}
+
+impl<T: Clone + std::fmt::Debug + PartialEq> Srcable for T {
+    fn no_src(self) -> Src<Self> {
+        Src {
+            src: None,
+            node: self,
         }
     }
 }
