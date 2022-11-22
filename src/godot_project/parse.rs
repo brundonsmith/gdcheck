@@ -19,7 +19,7 @@ use crate::utils::errors::ParseError;
 use crate::utils::{number_literal, string_literal};
 use crate::utils::{string_and_slice::StringAndSlice, ParseResult};
 
-use super::*;
+use super::ast::*;
 
 pub fn parse_godot_project(code: &String) -> Result<GodotProject, ParseError> {
     let res = many0(terminated(

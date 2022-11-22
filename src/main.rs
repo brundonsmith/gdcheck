@@ -4,7 +4,7 @@ mod utils;
 
 use std::{convert::TryInto, env::current_dir, path::PathBuf};
 
-use godot_project::GodotProject;
+use godot_project::ast::GodotProject;
 use walkdir::WalkDir;
 
 use crate::gdscript::parse::parse_script;

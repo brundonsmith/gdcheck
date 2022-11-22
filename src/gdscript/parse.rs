@@ -9,7 +9,7 @@ use nom::{
 
 use crate::utils::{errors::ParseError, string_and_slice::StringAndSlice, ParseResult, Src};
 
-use super::model::ast::*;
+use super::ast::*;
 
 pub fn parse_script(code: &String) -> Result<Vec<Src<Declaration>>, ParseError> {
     let res = terminated(
