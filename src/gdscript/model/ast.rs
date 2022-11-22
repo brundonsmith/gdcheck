@@ -1,16 +1,20 @@
-use std::{collections::HashMap};
+use enum_variant_type::EnumVariantType;
 
-use crate::utils::parse::Sourced;
+use crate::utils::Src;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, EnumVariantType)]
 pub enum Declaration {
     Extends(String),
     ClassName(String),
+    #[evt(skip)]
     ValDeclaration(ValDeclaration),
-    Annotation(Annotation),
+    Annotation {
+        name: Src<String>,
+        arguments: Vec<Src<Expression>>,
+    },
     Enum {
-        name: Option<Sourced<String>>,
-        variants: Vec<(Sourced<String>, Option<Sourced<Expression>>)>,
+        name: Option<Src<String>>,
+        variants: Vec<(Src<String>, Option<Src<Expression>>)>,
     },
     Func {
         is_static: bool,
@@ -19,57 +23,74 @@ pub enum Declaration {
         return_type: Option<Type>,
         body: Block,
     },
-    Class(Class),
+    Class {
+        name: Src<String>,
+        declarations: Vec<Src<Declaration>>,
+    },
 }
 
-type Block = Vec<Sourced<Statement>>;
+type Block = Vec<Src<Statement>>;
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ValDeclaration {
-    pub is_const: bool,
-    pub name: Sourced<String>,
-    pub declared_type: Option<Sourced<Type>>,
-    pub value: Option<Sourced<Expression>>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Annotation {
-    pub name: Sourced<String>,
-    pub arguments: Vec<Sourced<Expression>>,
-}
-
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Class {
-    pub name: Sourced<String>,
-    pub declarations: Vec<Sourced<Declaration>>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, EnumVariantType)]
 pub enum Expression {
     Int {
         value: i64,
         base: NumberBase,
     },
     Float(f64),
-    String {
+    GDString {
         value: String,
         multiline: bool,
     },
     Boolean(bool),
     Null,
-    Array(Vec<Sourced<Expression>>),
-    Dictionary(Vec<(Sourced<Expression>, Sourced<Expression>)>),
+    Array(Vec<Src<Expression>>),
+    Dictionary(Vec<(Src<Expression>, Src<Expression>)>),
     UnaryOperation {
-        op: Sourced<UnaryOperator>,
-        subject: Box<Sourced<Expression>>,
+        op: Src<UnaryOperator>,
+        subject: Box<Src<Expression>>,
     },
     BinaryOperation {
-        op: Sourced<BinaryOperator>,
-        left: Box<Sourced<Expression>>,
-        right: Box<Sourced<Expression>>,
+        op: Src<BinaryOperator>,
+        left: Box<Src<Expression>>,
+        right: Box<Src<Expression>>,
     },
     Identifier(String),
+}
+
+#[derive(Debug, Clone, PartialEq, EnumVariantType)]
+pub enum Statement {
+    #[evt(skip)]
+    ValDeclaration(ValDeclaration),
+    Assignment {
+        target: Src<Expression>,
+        value: Src<Expression>,
+        operator: Option<Src<BinaryOperator>>,
+    },
+    Match,
+    While {
+        condition: Src<Expression>,
+        body: Block,
+    },
+    If {
+        conditions: Vec<(Src<Expression>, Block)>,
+        default_outcome: Option<Block>,
+    },
+    For {
+        name: Src<String>,
+        iteree: Src<Expression>,
+    },
+    Pass,
+    Break,
+    Return(Src<Expression>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValDeclaration {
+    pub is_const: bool,
+    pub name: Src<String>,
+    pub declared_type: Option<Src<Type>>,
+    pub value: Option<Src<Expression>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,78 +133,39 @@ pub enum NumberBase {
     Sixteen,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, EnumVariantType)]
 pub enum Type {
     // Godot types
-    Null,
-    Bool,
-    Int,
-    Float,
-    String,
-    StringName,
-    Vector2,
-    Vector2i,
-    Vector3,
-    Vector3i,
-    Transform2D,
-    Plane,
-    AABB,
-    Basis,
-    Transform3D,
-    Color,
-    NodePath,
-    RID,
-    Object,
-    // Array,
-    // Dictionary,
-    Named(String),
+    NullType,
+    BoolType,
+    IntType,
+    FloatType,
+    StringType,
+    StringNameType,
+    Vector2Type,
+    Vector2iType,
+    Vector3Type,
+    Vector3iType,
+    Transform2DType,
+    PlaneType,
+    AABBType,
+    BasisType,
+    Transform3DType,
+    ColorType,
+    NodePathType,
+    RIDType,
+    ObjectType,
+    // ArrayType,
+    // DictionaryType,
+    NamedType(String),
 
     // gdcheck types
-    NonNull(Box<Sourced<Type>>),
-    Dictionary {
-        key: Box<Sourced<Type>>,
-        value: Box<Sourced<Type>>,
+    NonNullType(Box<Src<Type>>),
+    DictionaryType {
+        key: Box<Src<Type>>,
+        value: Box<Src<Type>>,
     },
-    ExactDictionary(Vec<(Sourced<Expression>, Sourced<Expression>)>),
-    Array(Box<Sourced<Type>>),
-    Any,
-}
-
-impl Type {
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "null" => Type::Null,
-            "bool" => Type::Bool,
-            "int" => Type::Int,
-            "float" => Type::Float,
-            "String" => Type::String,
-            _ => Type::Named(s.into())
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Statement {
-    ValDeclaration(ValDeclaration),
-    Assignment {
-        target: Sourced<Expression>,
-        value: Sourced<Expression>,
-        operator: Option<Sourced<BinaryOperator>>,
-    },
-    Match,
-    While {
-        condition: Sourced<Expression>,
-        body: Block,
-    },
-    If {
-        conditions: Vec<(Sourced<Expression>, Block)>,
-        default_outcome: Option<Block>,
-    },
-    For {
-        name: Sourced<String>,
-        iteree: Sourced<Expression>,
-    },
-    Pass,
-    Break,
-    Return(Sourced<Expression>),
+    ExactDictionaryType(Vec<(Src<Expression>, Src<Expression>)>),
+    ArrayType(Box<Src<Type>>),
+    AnyType,
 }
