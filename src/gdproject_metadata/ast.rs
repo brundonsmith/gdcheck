@@ -1,16 +1,16 @@
 use enum_variant_type::EnumVariantType;
 
 use super::parse::parse_gdproject_metadata;
-use crate::utils::errors::ParseError;
+use crate::utils::{errors::ParseError, slice::Slice};
 use std::{collections::HashMap, convert::TryFrom};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GDProjectMetadata {
     pub front_section: Section,
-    pub other_sections: HashMap<String, Section>,
+    pub other_sections: HashMap<Slice, Section>,
 }
 
-type Section = HashMap<String, EntryValue>;
+type Section = HashMap<Slice, EntryValue>;
 
 impl GDProjectMetadata {
     pub fn new() -> Self {
@@ -23,8 +23,8 @@ impl GDProjectMetadata {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
-    SectionName(String),
-    KeyAndValue((String, EntryValue)),
+    SectionName(Slice),
+    KeyAndValue((Slice, EntryValue)),
 }
 
 #[derive(Debug, Clone, PartialEq, EnumVariantType)]
@@ -32,34 +32,34 @@ pub enum EntryValue {
     Null,
     BooleanValue(bool),
     StringValue {
-        s: String,
+        s: Slice,
         ampersand: bool,
     },
-    NumberValue(String),
+    NumberValue(Slice),
     ListValue(Vec<EntryValue>),
-    DictValue(HashMap<String, EntryValue>),
+    DictValue(HashMap<Slice, EntryValue>),
     ObjectValue {
-        class: String,
-        properties: HashMap<String, EntryValue>,
+        class: Slice,
+        properties: HashMap<Slice, EntryValue>,
     },
     ConstructedValue {
-        class: String,
+        class: Slice,
         entries: Vec<EntryValue>,
     },
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GlobalScriptClass {
-    pub base: String,
-    pub class: String,
-    pub language: String,
-    pub path: String,
+    pub base: Slice,
+    pub class: Slice,
+    pub language: Slice,
+    pub path: Slice,
 }
 
-impl TryFrom<&String> for GDProjectMetadata {
+impl TryFrom<Slice> for GDProjectMetadata {
     type Error = ParseError;
 
-    fn try_from(value: &String) -> Result<Self, Self::Error> {
+    fn try_from(value: Slice) -> Result<Self, Self::Error> {
         parse_gdproject_metadata(value)
     }
 }

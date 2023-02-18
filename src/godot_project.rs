@@ -1,9 +1,9 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 
 use crate::{
     gdproject_metadata::ast::GDProjectMetadata,
     gdscript::{
-        ast::GDScript,
+        ast::{GDScript, ModuleID},
         rules::{Rule, RuleSeverity},
     },
 };
@@ -12,5 +12,5 @@ use crate::{
 pub struct GodotProject {
     pub metadata: GDProjectMetadata,
     pub rule_severity: HashMap<Rule, RuleSeverity>,
-    pub scripts: HashMap<String, GDScript>,
+    pub scripts: HashMap<ModuleID, GDScript>,
 }

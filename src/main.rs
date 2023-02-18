@@ -3,40 +3,57 @@ mod gdscript;
 mod godot_project;
 mod utils;
 
-use std::{collections::HashMap, convert::TryInto, env::current_dir, path::PathBuf};
+use std::{collections::HashMap, convert::TryInto, env::current_dir, path::PathBuf, rc::Rc};
 
 use gdproject_metadata::ast::GDProjectMetadata;
 use godot_project::GodotProject;
+use utils::slice::Slice;
 use walkdir::WalkDir;
 
-use crate::gdscript::{check::Check, parse::parse_script};
+use crate::gdscript::{
+    ast::ModuleID,
+    check::{CheckContext, Checkable},
+    parse::parse_script,
+};
 
 fn main() -> Result<(), ()> {
     let files = find_files();
 
     let project_code = std::fs::read_to_string(files.gdproject_metadata.unwrap()).unwrap();
-    let metadata: GDProjectMetadata = (&project_code).try_into().unwrap();
+    let metadata: GDProjectMetadata = Slice::new(Rc::new(project_code)).try_into().unwrap();
 
     let mut scripts = HashMap::new();
 
     for script in files.gdscripts {
+        let module_id = ModuleID(Rc::new(script.to_string_lossy().to_string()));
         let script_code = std::fs::read_to_string(script.clone()).unwrap();
-        let parsed = parse_script(&script_code).unwrap();
+        let parsed = parse_script(module_id.clone(), Slice::new(Rc::new(script_code))).unwrap();
 
         println!("\n\n\n\n{}\n\n{:?}", script.to_string_lossy(), parsed);
-        scripts.insert(String::from(script.to_string_lossy()), parsed);
+        scripts.insert(module_id, parsed);
     }
 
-    let project = GodotProject {
+    let godot_project = GodotProject {
         metadata,
         rule_severity: HashMap::new(),
         scripts,
     };
 
-    for (name, script) in project.scripts.iter() {
-        println!("Checking {}", name);
-        script.check(&project, script, &|_| todo!())
+    let mut errors = Vec::new();
+
+    for (module_id, script) in godot_project.scripts.iter() {
+        println!("Checking {}", module_id.0.as_str());
+
+        script.declarations.check(
+            CheckContext {
+                module_id,
+                godot_project: &godot_project,
+            },
+            &mut |err| errors.push(err),
+        )
     }
+
+    println!("\n\n{:?}", errors);
 
     Ok(())
 }

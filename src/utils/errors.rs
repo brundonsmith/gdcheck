@@ -3,25 +3,24 @@ use std::{fmt::Write, usize};
 use colored::Colorize;
 use enum_variant_type::EnumVariantType;
 
+use crate::gdscript::ast::ModuleID;
+
+use super::slice::Slice;
+
 #[derive(Debug, Clone, PartialEq, EnumVariantType)]
 pub enum GDError {
     #[evt(derive(Debug, Clone, PartialEq))]
     ParseError {
-        src: String,
-        index: Option<usize>,
+        module_id: Option<ModuleID>,
+        src: Slice,
         message: String,
     },
-    // #[evt(derive(Debug, Clone, PartialEq))]
-    // AssignmentError {
-    //     module_id: ModuleID,
-    //     src: Option<Slice>,
-    //     issues: SubsumationIssue,
-    // },
-    // #[evt(derive(Debug, Clone, PartialEq))]
-    // NotFoundError {
-    //     module_id: ModuleID,
-    //     identifier: Src<LocalIdentifier>,
-    // },
+    #[evt(derive(Debug, Clone, PartialEq))]
+    CheckError {
+        module_id: ModuleID,
+        src: Option<Slice>,
+        message: String,
+    },
 }
 
 // impl GDError {

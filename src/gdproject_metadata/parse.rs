@@ -6,8 +6,6 @@ use nom::bytes::complete::take_while;
 use nom::bytes::complete::take_while1;
 use nom::combinator::map;
 use nom::combinator::opt;
-use nom::error::VerboseError;
-use nom::error::VerboseErrorKind;
 use nom::multi::many0;
 use nom::multi::separated_list0;
 use nom::multi::separated_list1;
@@ -16,16 +14,19 @@ use nom::sequence::terminated;
 use nom::sequence::{preceded, tuple};
 
 use crate::utils::errors::ParseError;
+use crate::utils::slice::Slice;
+use crate::utils::ParseResult;
+use crate::utils::RawParseError;
+use crate::utils::RawParseErrorDetails;
 use crate::utils::{number_literal, string_literal};
-use crate::utils::{string_and_slice::StringAndSlice, ParseResult};
 
 use super::ast::*;
 
-pub fn parse_gdproject_metadata(code: &String) -> Result<GDProjectMetadata, ParseError> {
+pub fn parse_gdproject_metadata(code: Slice) -> Result<GDProjectMetadata, ParseError> {
     let res = many0(terminated(
         preceded(whitespace_and_comments, parse_item),
         whitespace_and_comments,
-    ))(code.into());
+    ))(code.clone());
 
     match res {
         Ok((i, items)) => {
@@ -69,46 +70,33 @@ pub fn parse_gdproject_metadata(code: &String) -> Result<GDProjectMetadata, Pars
             Ok(project)
             // }
         }
-        Err(error) => {
-            let errors = match error {
-                nom::Err::Error(VerboseError { errors }) => Some(errors),
-                nom::Err::Failure(VerboseError { errors }) => Some(errors),
-                nom::Err::Incomplete(_) => None,
-            };
-
-            println!("{:?}", errors);
-
-            let info = errors
-                .map(|errors| {
-                    errors
-                        .into_iter()
-                        .filter_map(|(input, kind)| {
-                            if let VerboseErrorKind::Context(context) = kind {
-                                Some((input, context))
-                            } else {
-                                None
-                            }
-                        })
-                        .next()
-                })
-                .flatten();
-
-            Err(info
-                .map(|(input, context)| ParseError {
-                    index: Some(input.slice.start + input.len()),
-                    src: code.clone(),
-                    message: format!("Failed while parsing {}", context),
-                })
-                .unwrap_or_else(|| ParseError {
-                    index: None,
-                    src: code.clone(),
-                    message: "Failed to parse".to_owned(),
-                }))
-        }
+        Err(error) => Err(match error {
+            nom::Err::Error(RawParseError { src, details }) => ParseError {
+                module_id: None,
+                src,
+                message: match details {
+                    RawParseErrorDetails::Kind(kind) => kind.description().to_owned(),
+                    RawParseErrorDetails::Char(ch) => format!("Expected '{}'", ch),
+                },
+            },
+            nom::Err::Failure(RawParseError { src, details }) => ParseError {
+                module_id: None,
+                src,
+                message: match details {
+                    RawParseErrorDetails::Kind(kind) => kind.description().to_owned(),
+                    RawParseErrorDetails::Char(ch) => format!("Expected '{}'", ch),
+                },
+            },
+            nom::Err::Incomplete(_) => ParseError {
+                module_id: None,
+                src: code,
+                message: "Failed to parse".to_owned(),
+            },
+        }),
     }
 }
 
-fn parse_item<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, Item> {
+fn parse_item(i: Slice) -> ParseResult<Item> {
     alt((
         map(parse_section_name, |name| Item::SectionName(name)),
         map(parse_key_and_value, |key_value| {
@@ -117,7 +105,7 @@ fn parse_item<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, Item> {
     ))(i)
 }
 
-fn parse_section_name<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, String> {
+fn parse_section_name(i: Slice) -> ParseResult<Slice> {
     map(
         tuple((
             tag("["),
@@ -128,7 +116,7 @@ fn parse_section_name<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, String> {
     )(i)
 }
 
-fn parse_key_and_value<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, (String, EntryValue)> {
+fn parse_key_and_value(i: Slice) -> ParseResult<(Slice, EntryValue)> {
     map(
         tuple((
             parse_key,
@@ -139,23 +127,20 @@ fn parse_key_and_value<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, (String, En
     )(i)
 }
 
-fn parse_key<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, String> {
-    map(
-        take_while1(|ch: char| ch.is_alphanumeric() || ch == '_' || ch == '/'),
-        |s: StringAndSlice<'a>| s.as_str().to_owned(),
-    )(i)
+fn parse_key(i: Slice) -> ParseResult<Slice> {
+    take_while1(|ch: char| ch.is_alphanumeric() || ch == '_' || ch == '/')(i)
 }
 
-fn parse_value<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, EntryValue> {
+fn parse_value(i: Slice) -> ParseResult<EntryValue> {
     alt((
         map(
             pair(opt(tag("&")), string_literal),
             |(ampersand, string)| EntryValue::StringValue {
-                s: string.node,
+                s: string,
                 ampersand: ampersand.is_some(),
             },
         ),
-        map(number_literal, |s| EntryValue::NumberValue(s.node)),
+        map(number_literal, |s| EntryValue::NumberValue(s)),
         map(parse_list, EntryValue::from),
         map(parse_dict, EntryValue::from),
         map(parse_object, EntryValue::from),
@@ -166,7 +151,7 @@ fn parse_value<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, EntryValue> {
     ))(i)
 }
 
-fn parse_list<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ListValue> {
+fn parse_list(i: Slice) -> ParseResult<ListValue> {
     map(
         tuple((
             tag("["),
@@ -183,7 +168,7 @@ fn parse_list<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ListValue> {
     )(i)
 }
 
-fn parse_dict<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, DictValue> {
+fn parse_dict(i: Slice) -> ParseResult<DictValue> {
     map(
         tuple((
             tag("{"),
@@ -200,18 +185,18 @@ fn parse_dict<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, DictValue> {
     )(i)
 }
 
-fn parse_dict_entry<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, (String, EntryValue)> {
+fn parse_dict_entry(i: Slice) -> ParseResult<(Slice, EntryValue)> {
     map(
         tuple((
             string_literal,
             preceded(whitespace_and_comments, tag(":")),
             preceded(whitespace_and_comments, parse_value),
         )),
-        |(key, _, value)| (key.node, value),
+        |(key, _, value)| (key, value),
     )(i)
 }
 
-fn parse_object<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ObjectValue> {
+fn parse_object(i: Slice) -> ParseResult<ObjectValue> {
     map(
         tuple((
             tag("Object"),
@@ -225,13 +210,13 @@ fn parse_object<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ObjectValue> {
             preceded(whitespace_and_comments, tag(")")),
         )),
         |(_, _, class, _, entries, _)| ObjectValue {
-            class: class.as_str().to_owned(),
+            class,
             properties: entries.into_iter().collect(),
         },
     )(i)
 }
 
-fn parse_constructed<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ConstructedValue> {
+fn parse_constructed(i: Slice) -> ParseResult<ConstructedValue> {
     map(
         tuple((
             parse_key,
@@ -239,14 +224,11 @@ fn parse_constructed<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ConstructedVa
             separated_list1(preceded(whitespace_and_comments, tag(",")), parse_value),
             preceded(whitespace_and_comments, tag(")")),
         )),
-        |(class, _, entries, _)| ConstructedValue {
-            class: class.as_str().to_owned(),
-            entries,
-        },
+        |(class, _, entries, _)| ConstructedValue { class, entries },
     )(i)
 }
 
-fn whitespace_and_comments<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, ()> {
+fn whitespace_and_comments(i: Slice) -> ParseResult<()> {
     map(
         many0(alt((
             map(

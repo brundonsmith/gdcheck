@@ -1,106 +1,74 @@
-use crate::utils::Src;
+use super::ast::*;
+impl<TKind> AST<TKind>
+where
+    TKind: Clone + TryFrom<Any>,
+    Any: From<TKind>,
+{
+    pub fn resolve_symbol(&self, symbol: &str) -> Option<ASTAny> {
+        match self.parent().as_ref().map(|p| p.details()) {
+            Some(Any::GDScript(GDScript { declarations })) => {
+                for decl in declarations {
+                    match &decl.downcast() {
+                        Declaration::ValueDeclaration(ValueDeclaration {
+                            is_const,
+                            name,
+                            declared_type,
+                            value,
+                        }) => {
+                            if name.downcast().name.as_str() == symbol {
+                                return Some(decl.clone().upcast());
+                            }
+                        }
+                        Declaration::FuncDeclaration(FuncDeclaration {
+                            is_static,
+                            name,
+                            args,
+                            return_type,
+                            body,
+                        }) => {
+                            if name.downcast().name.as_str() == symbol {
+                                return Some(decl.clone().upcast());
+                            }
+                        }
+                        Declaration::EnumDeclaration(_) => todo!(),
+                        Declaration::ClassDeclaration(_) => todo!(),
 
-use super::ast::{Declaration, Expression, GDScript, Statement, Type, ValDeclaration};
+                        Declaration::ExtendsDeclaration(_) => {}
+                        Declaration::ClassNameDeclaration(_) => {}
+                        Declaration::Annotation(_) => {}
+                    }
+                }
+            }
+            Some(Any::Block(Block { statements })) => {
+                for stmt in statements {
+                    match &stmt.downcast() {
+                        Statement::ValueDeclaration(ValueDeclaration {
+                            is_const,
+                            name,
+                            declared_type,
+                            value,
+                        }) => {
+                            if name.downcast().name.as_str() == symbol {
+                                return Some(stmt.clone().upcast());
+                            }
+                        }
+                        Statement::ForLoop(_) => todo!(),
 
-pub trait Resolve {
-    fn resolve(&self, identifier: &Src<String>) -> Option<Binding>;
-}
+                        Statement::AssignmentStatement(_) => {}
+                        Statement::MatchStatement(_) => {}
+                        Statement::WhileLoop(_) => {}
+                        Statement::IfElseStatement(_) => {}
+                        Statement::Pass(_) => {}
+                        Statement::Break(_) => {}
+                        Statement::Return(_) => {}
+                    }
+                }
+            }
+            _ => {}
+        }
 
-impl Resolve for GDScript {
-    fn resolve(&self, identifier: &Src<String>) -> Option<Binding> {
-        self.declarations
-            .iter()
-            .filter(|decl| decl.before(identifier))
-            .map(|decl| decl.resolve(identifier))
-            .next()
+        self.parent()
+            .map(|parent| parent.resolve_symbol(symbol))
             .flatten()
     }
-}
-
-impl Resolve for Src<Declaration> {
-    fn resolve(&self, identifier: &Src<String>) -> Option<Binding> {
-        match &self.node {
-            Declaration::Extends(class) => None,
-            Declaration::ClassName(class) => None,
-            Declaration::Annotation {
-                name: _,
-                arguments: _,
-            } => None,
-            Declaration::Enum { name, variants } => todo!(),
-            Declaration::ValDeclaration(ValDeclaration {
-                is_const: _,
-                name,
-                declared_type,
-                value,
-            }) => {
-                if name.node == identifier.node {
-                    Some(Binding::Value {
-                        declared_type: declared_type.clone(),
-                        value: value.clone(),
-                    })
-                } else {
-                    None
-                }
-            }
-            Declaration::Func {
-                is_static,
-                name,
-                args,
-                return_type,
-                body,
-            } => {
-                if name.node == identifier.node {
-                    Some(Binding::Func {
-                        args: args.clone(),
-                        return_type: return_type.clone(),
-                    })
-                } else {
-                    None
-                }
-            }
-            Declaration::Class { name, declarations } => todo!(),
-        }
-    }
-}
-
-impl Resolve for Src<Expression> {
-    fn resolve(&self, identifier: &Src<String>) -> Option<Binding> {
-        if !self.contains(identifier) {
-            None
-        } else {
-            todo!()
-        }
-    }
-}
-
-impl Resolve for Src<Statement> {
-    fn resolve(&self, identifier: &Src<String>) -> Option<Binding> {
-        if !self.contains(identifier) {
-            None
-        } else {
-            todo!()
-        }
-    }
-}
-
-impl Resolve for Src<Type> {
-    fn resolve(&self, identifier: &Src<String>) -> Option<Binding> {
-        if !self.contains(identifier) {
-            None
-        } else {
-            todo!()
-        }
-    }
-}
-
-pub enum Binding {
-    Type(Src<Type>),
-    Value {
-        declared_type: Option<Src<Type>>,
-        value: Option<Src<Expression>>,
-    },
-    Func {
-        args: Vec<(Src<String>, Option<Type>)>,
-        return_type: Option<Type>,
-    },
 }

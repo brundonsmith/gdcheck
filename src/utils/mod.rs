@@ -2,112 +2,91 @@ use nom::{
     bytes::complete::{escaped, tag, take_while, take_while1},
     character::complete::one_of,
     combinator::{cut, map, opt},
-    error::{context, VerboseError},
+    error::context,
     sequence::{pair, tuple},
     IResult,
 };
 
-use self::{slice::Slice, string_and_slice::StringAndSlice};
+use self::slice::{Slicable, Slice};
 
 pub mod errors;
 pub mod slice;
-pub mod string_and_slice;
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Src<T> {
-    pub src: Option<Slice>,
-    pub node: T,
+pub type ParseResult<T> = IResult<Slice, T, RawParseError>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RawParseError {
+    pub src: Slice,
+    pub details: RawParseErrorDetails,
 }
 
-impl<T: Clone + std::fmt::Debug + PartialEq> Src<T> {
-    pub fn contains<O>(&self, other: &Src<O>) -> bool {
-        self.src
-            .map(|s| other.src.map(|other| s.contains(other)))
-            .flatten()
-            .unwrap_or(false)
+#[derive(Debug, Clone, PartialEq)]
+pub enum RawParseErrorDetails {
+    Kind(nom::error::ErrorKind),
+    Char(char),
+}
+
+impl nom::error::ParseError<Slice> for RawParseError {
+    fn from_error_kind(input: Slice, kind: nom::error::ErrorKind) -> Self {
+        Self {
+            src: input,
+            details: RawParseErrorDetails::Kind(kind),
+        }
     }
 
-    pub fn after<O>(&self, other: &Src<O>) -> bool {
-        self.src
-            .map(|s| other.src.map(|other| s.start > other.end))
-            .flatten()
-            .unwrap_or(false)
+    fn append(_input: Slice, _kind: nom::error::ErrorKind, other: Self) -> Self {
+        other
     }
 
-    pub fn before<O>(&self, other: &Src<O>) -> bool {
-        self.src
-            .map(|s| other.src.map(|other| s.end < other.start))
-            .flatten()
-            .unwrap_or(false)
-    }
-
-    pub fn spanning<O>(&self, other: &Src<O>) -> Option<Slice> {
-        self.src
-            .map(|left_src| other.src.map(move |right_src| left_src.spanning(right_src)))
-            .flatten()
-    }
-
-    pub fn map<O, F: Fn(T) -> O>(self, f: F) -> Src<O> {
-        Src {
-            src: self.src,
-            node: f(self.node),
+    fn from_char(input: Slice, ch: char) -> Self {
+        Self {
+            src: input,
+            details: RawParseErrorDetails::Char(ch),
         }
     }
 }
 
-pub trait Srcable: Clone + std::fmt::Debug + PartialEq {
-    fn with_src(self, src: Slice) -> Src<Self> {
-        Src {
-            src: Some(src),
-            node: self,
-        }
+impl nom::error::ContextError<Slice> for RawParseError {
+    fn add_context(_input: Slice, _ctx: &'static str, other: Self) -> Self {
+        other
     }
+}
 
-    fn no_src(self) -> Src<Self> {
-        Src {
-            src: None,
-            node: self,
+impl<E> nom::error::FromExternalError<Slice, E> for RawParseError {
+    fn from_external_error(input: Slice, kind: nom::error::ErrorKind, _e: E) -> Self {
+        Self {
+            src: input,
+            details: RawParseErrorDetails::Kind(kind),
         }
     }
 }
 
-impl<T: Clone + std::fmt::Debug + PartialEq> Srcable for T {}
-
-pub type ParseResult<'a, T> = IResult<StringAndSlice<'a>, T, VerboseError<StringAndSlice<'a>>>;
-
-pub fn string_literal<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, Src<String>> {
+pub fn string_literal(i: Slice) -> ParseResult<Slice> {
     context(
         "string",
         map(
             pair(tag("\""), cut(pair(string_contents, tag("\"")))),
-            |(open_quote, (contents, close_quote))| Src {
-                src: Some(open_quote.slice.spanning(close_quote.slice)),
-                node: contents.as_str().to_owned(),
-            },
+            |(open_quote, (contents, close_quote))| open_quote.spanning(&close_quote),
         ),
     )(i)
 }
 
-pub fn string_contents<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, StringAndSlice<'a>> {
+pub fn string_contents(i: Slice) -> ParseResult<Slice> {
     escaped(take_while(|ch: char| ch != '"'), '\\', one_of("\"n\\"))(i)
 }
 
-pub fn number_literal<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, Src<String>> {
+pub fn number_literal<'a>(i: Slice) -> ParseResult<Slice> {
     map(
         tuple((opt(tag("-")), numeric, opt(tuple((tag("."), cut(numeric)))))),
         |(neg, int, tail)| {
-            let front = neg.unwrap_or(int);
+            let front = neg.unwrap_or(int.clone());
             let back = tail.map(|(_, decimal)| decimal).unwrap_or(int);
-            let full = front.spanning(&back);
 
-            Src {
-                src: Some(full.slice),
-                node: full.as_str().to_owned(),
-            }
+            front.spanning(&back)
         },
     )(i)
 }
 
-pub fn numeric<'a>(i: StringAndSlice<'a>) -> ParseResult<'a, StringAndSlice<'a>> {
+pub fn numeric<'a>(i: Slice) -> ParseResult<Slice> {
     take_while1(|c: char| c.is_numeric())(i)
 }
